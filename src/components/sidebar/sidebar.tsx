@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   BanknoteArrowDown,
   Files,
+  Plus,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import Link from "next/link";
@@ -87,6 +88,12 @@ const employeeMenuItems: MenuItem[] = [
     label: "Abrir Conta",
     icon: UserPlus,
     path: "/funcionario/abrir-conta",
+  },
+  {
+    id: "cadastrar",
+    label: "Cadastrar Funcionário",
+    icon: Plus,
+    path: "/funcionario/cadastrar",
   },
   {
     id: "relatorios",

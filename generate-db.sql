@@ -378,6 +378,20 @@ LEFT JOIN cliente cl_destino ON c_destino.id_cliente = cl_destino.id_cliente
 LEFT JOIN usuario u_destino ON cl_destino.id_usuario = u_destino.id_usuario
 WHERE t.data_hora >= NOW() - INTERVAL 90 DAY;
 
+CREATE OR REPLACE VIEW vw_clientes_inadimplentes AS
+SELECT
+    u.nome AS nome_cliente,
+    u.cpf,
+    co.numero_conta,
+    co.saldo,
+    co.tipo_conta,
+    co.status
+FROM conta co
+JOIN cliente c ON co.id_cliente = c.id_cliente
+JOIN usuario u ON c.id_usuario = u.id_usuario
+WHERE co.saldo < 0
+ORDER BY co.saldo ASC;
+
 -- =================================================================
 -- Criação de contas
 -- =================================================================
@@ -434,6 +448,88 @@ INSERT INTO endereco (
     'Taguatinga',
     'DF'
 );
-
--- Envia mensagem de retorno caso tenha sucesso
 SELECT 'Funcionário criado com sucesso.' AS resultado;
+
+--
+
+ALTER TABLE conta
+ADD COLUMN id_funcionario_abertura INT,
+ADD FOREIGN KEY (id_funcionario_abertura) REFERENCES funcionario(id_funcionario);
+
+CREATE OR REPLACE VIEW vw_relatorio_movimentacoes AS
+SELECT
+    t.id_transacao,
+    t.data_hora,
+    t.tipo_transacao,
+    t.valor,
+    t.descricao,
+    u.nome AS nome_cliente,
+    u.cpf,
+    co.numero_conta,
+    ag.nome AS nome_agencia,
+    ag.id_agencia
+FROM transacao t
+JOIN conta co ON t.id_conta_origem = co.id_conta
+JOIN cliente c ON co.id_cliente = c.id_cliente
+JOIN usuario u ON c.id_usuario = u.id_usuario
+JOIN agencia ag ON co.id_agencia = ag.id_agencia;
+
+CREATE OR REPLACE VIEW vw_clientes_inadimplentes AS
+SELECT
+    u.nome AS nome_cliente,
+    u.cpf,
+    co.numero_conta,
+    co.saldo
+FROM conta co
+JOIN cliente c ON co.id_cliente = c.id_cliente
+JOIN usuario u ON c.id_usuario = u.id_usuario
+WHERE co.saldo < 0
+ORDER BY co.saldo ASC;
+
+CREATE OR REPLACE VIEW vw_desempenho_funcionarios AS
+SELECT
+    f.id_funcionario,
+    u.nome AS nome_funcionario,
+    f.cargo,
+    COUNT(c.id_conta) AS contas_abertas_total,
+    COUNT(CASE WHEN MONTH(c.data_abertura) = MONTH(CURDATE()) AND YEAR(c.data_abertura) = YEAR(CURDATE()) THEN 1 END) AS contas_abertas_mes
+FROM funcionario f
+JOIN usuario u ON f.id_usuario = u.id_usuario
+LEFT JOIN conta c ON f.id_funcionario = c.id_funcionario_abertura
+GROUP BY f.id_funcionario, u.nome, f.cargo;
+
+CREATE OR REPLACE VIEW vw_relatorio_movimentacoes AS
+SELECT
+    t.id_transacao,
+    t.data_hora,
+    t.tipo_transacao,
+    t.valor,
+    t.descricao,
+    u.nome AS nome_cliente,
+    u.cpf,
+    co.numero_conta,
+    ag.nome AS nome_agencia,
+    ag.id_agencia
+FROM transacao t
+JOIN conta co ON t.id_conta_origem = co.id_conta
+JOIN cliente c ON co.id_cliente = c.id_cliente
+JOIN usuario u ON c.id_usuario = u.id_usuario
+JOIN agencia ag ON co.id_agencia = ag.id_agencia;
+
+
+ALTER TABLE conta
+ADD COLUMN id_funcionario_abertura INT,
+ADD CONSTRAINT fk_funcionario_abertura
+FOREIGN KEY (id_funcionario_abertura) REFERENCES funcionario(id_funcionario);
+
+CREATE OR REPLACE VIEW vw_desempenho_funcionarios AS
+SELECT
+    f.id_funcionario,
+    u.nome AS nome_funcionario,
+    f.cargo,
+    IFNULL(COUNT(c.id_conta), 0) AS contas_abertas_total,
+    IFNULL(SUM(CASE WHEN MONTH(c.data_abertura) = MONTH(CURDATE()) AND YEAR(c.data_abertura) = YEAR(CURDATE()) THEN 1 ELSE 0 END), 0) AS contas_abertas_mes
+FROM funcionario f
+JOIN usuario u ON f.id_usuario = u.id_usuario
+LEFT JOIN conta c ON f.id_funcionario = c.id_funcionario_abertura
+GROUP BY f.id_funcionario, u.nome, f.cargo;

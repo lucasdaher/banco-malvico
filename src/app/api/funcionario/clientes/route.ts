@@ -1,11 +1,20 @@
-// /app/api/funcionario/clientes/route.ts
-
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import pool from "@/lib/db";
 import * as jose from "jose";
 import bcrypt from "bcrypt";
-import { verifyToken } from "@/lib/auth";
+
+// Função auxiliar para verificar o token JWT.
+// É uma boa prática movê-la para um arquivo central como /src/lib/auth.ts se ainda não o fez.
+async function verifyToken(token: string): Promise<any> {
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+    const { payload } = await jose.jwtVerify(token, secret);
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
 
 /**
  * Rota GET para buscar a lista de todos os clientes.
@@ -48,8 +57,8 @@ export async function POST(request: Request) {
       throw new Error("Não autorizado.");
     }
     const payload = await verifyToken(tokenCookie.value);
-    if (!payload || payload.tipo_usuario !== "FUNCIONARIO") {
-      throw new Error("Acesso negado.");
+    if (!payload || !payload.id || payload.tipo_usuario !== "FUNCIONARIO") {
+      throw new Error("Acesso negado ou token inválido.");
     }
 
     const {
@@ -62,19 +71,27 @@ export async function POST(request: Request) {
       endereco,
       tipo_conta,
       saldo_inicial,
-      // Conta Corrente
       limite,
       data_vencimento,
       taxa_manutencao,
-      // Conta Poupança
       taxa_rendimento,
-      // Conta Investimento
       perfil_risco,
       valor_minimo,
       taxa_rendimento_base,
     } = await request.json();
 
     await connection.beginTransaction();
+
+    const [funcRows]: any = await connection.query(
+      "SELECT id_funcionario FROM funcionario WHERE id_usuario = ?",
+      [payload.id]
+    );
+    if (funcRows.length === 0) {
+      throw new Error(
+        "Registro de funcionário não encontrado para o usuário logado."
+      );
+    }
+    const id_funcionario_abertura = funcRows[0].id_funcionario;
 
     const senha_hash = await bcrypt.hash(senha, 10);
     const [userResult]: any = await connection.query(
@@ -106,13 +123,19 @@ export async function POST(request: Request) {
       10000 + Math.random() * 90000
     )}-${Math.floor(Math.random() * 10)}`;
     const [contaResult]: any = await connection.query(
-      "INSERT INTO conta (numero_conta, id_agencia, id_cliente, tipo_conta, saldo) VALUES (?, ?, ?, ?, ?)",
-      [numero_conta, 1, id_cliente, tipo_conta.toUpperCase(), saldo_inicial]
+      "INSERT INTO conta (numero_conta, id_agencia, id_cliente, tipo_conta, saldo, id_funcionario_abertura) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        numero_conta,
+        1,
+        id_cliente,
+        tipo_conta.toUpperCase(),
+        saldo_inicial,
+        id_funcionario_abertura,
+      ]
     );
     const id_conta = contaResult.insertId;
 
     const tipoContaUpper = tipo_conta.toUpperCase();
-
     if (tipoContaUpper === "CORRENTE") {
       if (
         limite === undefined ||

@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EncerrarContaDialog } from "@/components/encerrar-conta";
 
 export default function GerenciarClientesPage() {
   const [clientes, setClientes] = useState<ResumoCliente[]>([]);
@@ -167,10 +168,19 @@ export default function GerenciarClientesPage() {
                                 Ver Detalhes
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>Editar Cliente</DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link
+                                href={`/funcionario/clientes/${cliente.id_cliente}/editar`}
+                              >
+                                Editar Cliente
+                              </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-500 focus:text-white focus:bg-red-500">
-                              Encerrar Conta
+                              <EncerrarContaDialog
+                                clienteId={JSON.stringify(cliente.id_cliente)}
+                                clienteNome={cliente.nome_cliente}
+                              />
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
